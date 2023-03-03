@@ -1,30 +1,36 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-class Kalman_filter():
-    def __init__(self, A, B, C, Ex, Ez):
-        self.A = A
-        self.B = B
-        self.C = C
+class extended_Kalman_filter():
+    def __init__(self, g, h, dg_dx, dh_dx, Ex, Ez):
+        self.g = g
+        self.h = h
+        self.dg_dx = dg_dx
+        self.dh_dx = dh_dx
         self.Sigma = Ex.copy()
         self.Ex = Ex
         self.Ez = Ez
         
     def __call__(self, x_est_previous, control, measurement):
-        x_pred = self.A @ x_est_previous + self.B @ control
-        Sigma_pred = self.A @ self.Sigma @ (self.A.T) + self.Ex
+        Gt = self.dg_dx(x_est_previous, control)
+        Ht = self.dh_dx(x_est_previous)
+                
+        x_pred = self.g(x_est_previous, control)
+        Sigma_pred = Gt @ self.Sigma @ (Gt.T) + self.Ex
         
-        K = Sigma_pred @ self.C.T @ np.linalg.inv(self.C @ Sigma_pred @ self.C.T + Ez)
+        K = Sigma_pred @ Ht.T @ np.linalg.inv(Ht @ Sigma_pred @ Ht.T + Ez)
         
-        x_est = x_pred + K @ (measurement - self.C @ x_pred)
-        self.Sigma = (np.eye(len(self.A)) - K @ self.C) @ Sigma_pred
+        x_est = x_pred + K @ (measurement - self.h(x_pred))
+        self.Sigma = (np.eye(len(x_est_previous))- K @ Ht) @ Sigma_pred
         
         return x_est
     
 # EXAMPLE
-    
-# Generate noised data for material point under constant acceleration
-    
+
+# Plant model
+# x_t = g(x_t-1, u_t) = Ax + Bu
+# z_t = h(x_t) = Cx
+
 if __name__ == '__main__':
     duration = 10
     dt = 0.1 # sample time
@@ -36,6 +42,20 @@ if __name__ == '__main__':
     B = np.array([[dt**2], [dt]])
     C = np.array([[1, 0]])
 
+    #g = Ax+Bu
+    def g(x, u):
+        return A @ x + B @ u
+
+    def dg_dx(x, u):
+        return A
+
+    # h = Cx
+    def h(x):
+        return C
+
+    def dh_dx(x):
+        return C
+    
     sigma_z = 50 # sensor variance
     Ez = sigma_z**2
     accel_noise_mag = 0.05 # acceleration disturbance
@@ -58,22 +78,20 @@ if __name__ == '__main__':
         v.append(x[1][0])
         z.append(y)
         
-    # Kalman filter
+    # Extended Kalman filter
+    
+    p_est = []
+    v_est = []
+    x = np.array([[0], [0]])
 
-    p_est = [] # position estimation array
-    v_est = [] # velocity estimation array
-    x = np.array([[0], [0]]) # initial state estimate
-
-    kalman = Kalman_filter(A, B, C, Ex, Ez)
+    ext_kalman = extended_Kalman_filter(g, h, dg_dx, dh_dx, Ex, Ez)
 
     for i in range(len(t)):
-        x = kalman(x, np.array([[u]]), z[i])
-        
+        x = ext_kalman(x, np.array([[u]]), z[i])
+    
         p_est.append(x[0][0])
         v_est.append(x[1][0])
-        
-
-
+    
     plt.plot(t, p, c='b', label='position')
     plt.plot(t, z, c='r', label='measurement')
     plt.plot(t, p_est, c='g', label='estimate')
