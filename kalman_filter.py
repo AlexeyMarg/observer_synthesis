@@ -14,7 +14,7 @@ class Kalman_filter():
         x_pred = self.A @ x_est_previous + self.B @ control
         Sigma_pred = self.A @ self.Sigma @ (self.A.T) + self.Ex
         
-        K = Sigma_pred @ self.C.T @ np.linalg.inv(self.C @ Sigma_pred @ C.T + Ez)
+        K = Sigma_pred @ self.C.T @ np.linalg.inv(self.C @ Sigma_pred @ self.C.T + Ez)
         
         x_est = x_pred + K @ (measurement - self.C @ x_pred)
         self.Sigma = (np.eye(len(self.A)) - K @ self.C) @ Sigma_pred
